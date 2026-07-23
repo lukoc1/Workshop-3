@@ -1,4 +1,4 @@
-package pl.lukasz.web.entity;
+package pl.lukasz.entity;
 
 public class User {
 

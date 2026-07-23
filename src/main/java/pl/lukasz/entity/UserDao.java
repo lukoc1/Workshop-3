@@ -1,4 +1,4 @@
-package pl.lukasz.web.entity;
+package pl.lukasz.entity;
 
 import pl.coderslab.utils.DbUtil;
 import pl.coderslab.utils.PasswordUtil;
