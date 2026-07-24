@@ -1,12 +1,9 @@
 package pl.lukasz.entity;
 
-import pl.coderslab.utils.DbUtil;
-import pl.coderslab.utils.PasswordUtil;
+import pl.lukasz.utils.DbUtil;
+import pl.lukasz.utils.PasswordUtil;
 
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
+import java.sql.*;
 import java.util.Arrays;
 
 public class UserDao {
@@ -30,9 +27,9 @@ public class UserDao {
     //    create - zapisuje obiekt do tabeli jako nowy wiersz
     public User create(User user) {
 
-        try (Connection conn = DbUtil.connect()) {
+        try (Connection conn = DbUtil.getConnection()) {
 
-            int id = DbUtil.insert(conn, CREATE_USER_QUERY, user.getUserName(),
+            int id = insert(conn, CREATE_USER_QUERY, user.getUserName(),
                         user.getEmail(), PasswordUtil.hashPassword(user.getPassword()));
             user.setId(id);
             return user;
@@ -44,12 +41,12 @@ public class UserDao {
     }
 
 
-//    read - wczytuje jeden wiersz z tabeli i zwraca obiekt, ktory ten wiersz reprezentuje
+////    read - wczytuje jeden wiersz z tabeli i zwraca obiekt, ktory ten wiersz reprezentuje
     public User read(int userId) {
 
-        try (Connection conn = DbUtil.connect()) {
+        try (Connection conn = DbUtil.getConnection()) {
 
-            String[][] temp = DbUtil.getData(READ_USER_QUERY, userId);
+            String[][] temp = getData(READ_USER_QUERY, userId);
 
             if (temp.length == 0) {
                 System.out.println("User with id " + userId + " not found.");
@@ -69,11 +66,11 @@ public class UserDao {
         }
     }
 
-//    update - zapisuje obiekt do tabeli dokonujac modyfikacji istniejacego wczesniej wiersza tabeli
+////    update - zapisuje obiekt do tabeli dokonujac modyfikacji istniejacego wczesniej wiersza tabeli
     public void update(User user) {
 
-        try (Connection conn = DbUtil.connect()) {
-            DbUtil.update(conn, UPDATE_USER_QUERY, user);
+        try (Connection conn = DbUtil.getConnection()) {
+            update(conn, UPDATE_USER_QUERY, user);
 
         } catch (SQLException e) {
             e.printStackTrace();
@@ -81,21 +78,21 @@ public class UserDao {
     }
 
 
-//    delete - usuwa obiekt z tabeli czyli usuwa wiersz o id takim samym jak zapisany w obiekcie
+////    delete - usuwa obiekt z tabeli czyli usuwa wiersz o id takim samym jak zapisany w obiekcie
     public void delete(int userId) {
 
-        try (Connection conn = DbUtil.connect()) {
-            DbUtil.remove(conn, DELETE_USER_QUERY, userId);
+        try (Connection conn = DbUtil.getConnection()) {
+            remove(conn, DELETE_USER_QUERY, userId);
 
         } catch (SQLException e) {
             e.printStackTrace();
         }
     }
 
-//    findAll - lista obiektow stworzonych z tabeli (wszystkich)
+////    findAll - lista obiektow stworzonych z tabeli (wszystkich)
       public User[] findAll() {
 
-          try (Connection conn = DbUtil.connect();
+          try (Connection conn = DbUtil.getConnection();
                PreparedStatement statement = conn.prepareStatement(FIND_ALL_USER_QUERY)){
 
               ResultSet resultSet = statement.executeQuery();
@@ -130,7 +127,7 @@ public class UserDao {
 
     public void updatePassword(int userId, String newPassword) {
 
-        try (Connection conn = DbUtil.connect();
+        try (Connection conn = DbUtil.getConnection();
              PreparedStatement statement =
                      conn.prepareStatement(CHANGE_PASSWORD_QUERY)) {
 
@@ -146,6 +143,188 @@ public class UserDao {
         } catch (SQLException e) {
             e.printStackTrace();
         }
+    }
+
+
+    ////////////////////////
+
+    public static int insert(Connection conn, String query, String... params) {
+        try ( PreparedStatement statement = conn.prepareStatement(query, Statement.RETURN_GENERATED_KEYS)) {
+            statement.setString(1, params[0]);
+            statement.setString(2, params[1]);
+            statement.setString(3, params[2]);
+            statement.executeUpdate();
+
+            ResultSet resultSet = statement.getGeneratedKeys();
+            if (resultSet.next()) {
+                return resultSet.getInt(1);
+            }
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return 0;
+    }
+
+    public static void remove(Connection conn, String query, int id) {
+        try (PreparedStatement statement =
+                     conn.prepareStatement(query);) {
+            statement.setInt(1, id);
+
+            int row = statement.executeUpdate();
+
+            if (row == 0) {
+                System.out.println("Couldnt find User id: " + id + ", to remove");
+            }
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    //    UPDATE
+    public static void update(Connection conn, String query, String... params) {
+        try ( PreparedStatement statement = conn.prepareStatement(query)) {
+            for (int i = 0; i < params.length; i++) {
+                statement.setString(i + 1, params[i]);
+            }
+
+            int rowsUpdated = statement.executeUpdate();
+
+            if (rowsUpdated == 0) {
+                System.out.println("Could not find user to update with this query: " + query);
+            }
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    //    UPDATE - but takes user as parameter
+    public static void update(Connection conn, String query, User user) {
+
+        if (user == null) {
+            return;
+        }
+
+        try (PreparedStatement statement = conn.prepareStatement(query)) {
+
+            statement.setString(1, user.getUserName());
+            statement.setString(2, user.getEmail());
+//            statement.setString(3, PasswordUtil.hashPassword(user.getPassword()));
+            statement.setInt(3, user.getId());
+
+            int rowsUpdated = statement.executeUpdate();
+
+            if (rowsUpdated == 0) {
+                System.out.println("Could not find user with id: " + user.getId());
+            }
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+
+    //    //            4. Metoda count(String sqlQuery) - która zwraca ilość wierszy dla zadanego zapytania
+    public static int count(String sqlQuery) {
+        try (Connection conn = DbUtil.getConnection();
+             PreparedStatement statement = conn.prepareStatement(sqlQuery);
+             ResultSet resultSet = statement.executeQuery()) {
+
+            int count = 0;
+
+            while (resultSet.next()) {
+                count++;
+            }
+
+            return count;
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+
+        return 0;
+    }
+
+    //  5. Metoda zwracająca czy wiersz o zadanym id istnieje w tabeli:
+    //      public static boolean exists(Connection conn, String tableName, int id)
+    public static boolean exists(Connection conn, int id) {
+
+        String sqlQuery = "SELECT * FROM users WHERE id = ?;";
+        try (PreparedStatement statement = conn.prepareStatement(sqlQuery)) {
+
+            statement.setInt(1, id);
+
+            try (ResultSet resultSet = statement.executeQuery()) {
+                return resultSet.next();
+            }
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return false;
+    }
+
+    //    //            6. Metoda getData - która zwróci tablicę tablic w wynikami dla zadanego zapytania
+    public static String[][] getData(String sqlQuery) {
+        try (Connection conn = DbUtil.getConnection();
+             PreparedStatement statement = conn.prepareStatement(sqlQuery)){
+
+            ResultSet resultSet = statement.executeQuery();
+            ResultSetMetaData rsmd = resultSet.getMetaData();
+
+            int columnsNumber = rsmd.getColumnCount();
+            int rowsNumber = count(sqlQuery);
+
+            String[][] data = new String[rowsNumber][columnsNumber];
+
+            int row = 0;
+
+            while (resultSet.next()) {
+                for (int col = 0; col < columnsNumber; col++) {
+                    data[row][col] = resultSet.getString(col + 1);
+                }
+                row++;
+            }
+            return data;
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+
+        return new String[0][0];
+
+    }
+
+
+    //    //            6. Metoda getData - która zwróci tablicę tablic w wynikami dla zadanego zapytania
+    public static String[][] getData(String sqlQuery, int id) {
+        try (Connection conn = DbUtil.getConnection();
+             PreparedStatement statement = conn.prepareStatement(sqlQuery)){
+
+            statement.setInt(1, id);
+            ResultSet resultSet = statement.executeQuery();
+            ResultSetMetaData rsmd = resultSet.getMetaData();
+
+            int columnsNumber = rsmd.getColumnCount();
+
+            if (!resultSet.next()) {
+                return new String[0][0];
+            }
+
+            String[][] data = new String[1][columnsNumber];
+
+            for (int col = 0; col < columnsNumber; col++) {
+                data[0][col] = resultSet.getString(col + 1);
+            }
+
+            return data;
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+
+        return new String[0][0];
+
     }
 
 }
